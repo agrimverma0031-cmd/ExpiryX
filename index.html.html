@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renewal & Expiry Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Navigation Bar -->
+    <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/60 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">ExpiryKeeper</h1>
+                    <p class="text-xs text-slate-400">Renewal & Expiry Alert System</p>
+                </div>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button onclick="requestBrowserNotifications()" id="notifBtn" class="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition flex items-center gap-2">
+                    <i class="fa-solid fa-bell text-yellow-400" id="notifIcon"></i>
+                    <span class="hidden sm:inline" id="notifText">Enable Notifications</span>
+                </button>
+                <button onclick="openWebhookModal()" class="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span class="hidden sm:inline">Auto-Alerts & Webhooks</span>
+                </button>
+                <button onclick="openItemModal()" class="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-600/30 transition flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Item</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Banner for Browser Notifications if not granted -->
+        <div id="notificationBanner" class="hidden bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-amber-500/20 rounded-lg text-amber-400">
+                    <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-amber-200 text-sm">Browser Alerts Disabled</h3>
+                    <p class="text-xs text-amber-300/80">Allow desktop notifications to get instant alerts 30, 15, and 7 days before items expire.</p>
+                </div>
+            </div>
+            <button onclick="requestBrowserNotifications()" class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-xs rounded-lg transition whitespace-nowrap">
+                Enable Alerts
+            </button>
+        </div>
+
+        <!-- Metric Cards Grid -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Items -->
+            <div onclick="filterByStatus('all')" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 sm:p-5 hover:border-slate-600 transition cursor-pointer group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs sm:text-sm font-medium text-slate-400">Total Tracked</span>
+                    <div class="p-2 bg-slate-700/50 rounded-lg text-slate-300 group-hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="statTotal" class="text-2xl sm:text-3xl font-bold text-white">0</span>
+                    <span class="text-xs text-slate-500">Items</span>
+                </div>
+            </div>
+
+            <!-- Expiring Soon -->
+            <div onclick="filterByStatus('expiring')" class="bg-slate-800/60 border border-amber-500/30 rounded-xl p-4 sm:p-5 hover:border-amber-500/60 transition cursor-pointer group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs sm:text-sm font-medium text-amber-400">Expiring Soon</span>
+                    <div class="p-2 bg-amber-500/10 rounded-lg text-amber-400 group-hover:bg-amber-500/20 transition">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="statExpiring" class="text-2xl sm:text-3xl font-bold text-amber-400">0</span>
+                    <span class="text-xs text-amber-400/70">within 30d</span>
+                </div>
+            </div>
+
+            <!-- Expired -->
+            <div onclick="filterByStatus('expired')" class="bg-slate-800/60 border border-rose-500/30 rounded-xl p-4 sm:p-5 hover:border-rose-500/60 transition cursor-pointer group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs sm:text-sm font-medium text-rose-400">Expired</span>
+                    <div class="p-2 bg-rose-500/10 rounded-lg text-rose-400 group-hover:bg-rose-500/20 transition">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="statExpired" class="text-2xl sm:text-3xl font-bold text-rose-400">0</span>
+                    <span class="text-xs text-rose-400/70">action needed</span>
+                </div>
+            </div>
+
+            <!-- Active -->
+            <div onclick="filterByStatus('active')" class="bg-slate-800/60 border border-emerald-500/30 rounded-xl p-4 sm:p-5 hover:border-emerald-500/60 transition cursor-pointer group">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs sm:text-sm font-medium text-emerald-400">Active</span>
+                    <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500/20 transition">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span id="statActive" class="text-2xl sm:text-3xl font-bold text-emerald-400">0</span>
+                    <span class="text-xs text-emerald-400/70">>30 days left</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filters, Search & Controls Bar -->
+        <section class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+            <!-- Search Input -->
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="searchInput" oninput="renderItems()" placeholder="Search insurance, domain, passport, vehicle..." class="w-full pl-10 pr-4 py-2 bg-slate-900/80 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
+            </div>
+
+            <!-- Filters Group -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Status Filter -->
+                <select id="statusFilter" onchange="renderItems()" class="bg-slate-900/80 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500 transition">
+                    <option value="all">All Statuses</option>
+                    <option value="expiring">Expiring Soon (<=30d)</option>
+                    <option value="expired">Expired</option>
+                    <option value="active">Active (>30d)</option>
+                </select>
+
+                <!-- Category Filter -->
+                <select id="categoryFilter" onchange="renderItems()" class="bg-slate-900/80 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-brand-500 transition">
+                    <option value="all">All Categories</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Vehicle">Vehicle</option>
+                    <option value="Identification">Identification</option>
+                    <option value="Subscriptions">Subscriptions</option>
+                    <option value="Warranties">Warranties</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <!-- View Toggle Buttons -->
+                <div class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700">
+                    <button id="viewGridBtn" onclick="setViewMode('grid')" class="px-2.5 py-1 text-xs rounded font-medium text-slate-200 bg-slate-700 transition">
+                        <i class="fa-solid fa-grip-vertical mr-1"></i> Cards
+                    </button>
+                    <button id="viewTableBtn" onclick="setViewMode('table')" class="px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition">
+                        <i class="fa-solid fa-list mr-1"></i> Table
+                    </button>
+                </div>
+
+                <!-- Export Calendar Button -->
+                <button onclick="exportAllCalendar()" title="Export All to .ics Calendar" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition flex items-center gap-2">
+                    <i class="fa-regular fa-calendar-plus text-indigo-400"></i>
+                    <span class="hidden lg:inline">Export Calendar</span>
+                </button>
+
+                <!-- Data Backup Options Dropdown -->
+                <button onclick="toggleDataMenu()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition flex items-center gap-2 relative">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                
+                <!-- Data Popup Menu -->
+                <div id="dataMenu" class="hidden absolute right-4 mt-36 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-40 py-2">
+                    <button onclick="exportJSON()" class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-download text-brand-400"></i> Export Backup (JSON)
+                    </button>
+                    <label class="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-upload text-sky-400"></i> Import Backup
+                        <input type="file" id="importFileInput" onchange="importJSON(event)" accept=".json" class="hidden">
+                    </label>
+                    <hr class="border-slate-700 my-1">
+                    <button onclick="resetPresetData()" class="w-full text-left px-4 py-2 text-xs text-amber-400 hover:bg-slate-700 flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-rotate-right"></i> Reset Demo Data
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Area: Grid or Table -->
+        <section id="itemsContainer">
+            <!-- Javascript dynamic rendering -->
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/50 py-6 mt-12 text-center text-xs text-slate-500">
+        <p>ExpiryKeeper — Stay ahead of renewals, avoid late fees and lapse in coverage.</p>
+    </footer>
+
+    <!-- ADD/EDIT ITEM MODAL -->
+    <div id="itemModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden my-8 transform transition-all">
+            <div class="px-6 py-4 border-b border-slate-700/80 flex items-center justify-between bg-slate-800/50">
+                <h3 id="modalTitle" class="font-bold text-lg text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-brand-500"></i>
+                    <span>Add Renewal Item</span>
+                </h3>
+                <button onclick="closeItemModal()" class="text-slate-400 hover:text-white p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="itemForm" onsubmit="saveItem(event)" class="p-6 space-y-4">
+                <input type="hidden" id="itemId">
+
+                <!-- Item Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Item Title *</label>
+                    <input type="text" id="itemName" required placeholder="e.g., Health Insurance, Passport, Domain Renewal" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                </div>
+
+                <!-- Category & Renewal Date Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Category</label>
+                        <select id="itemCategory" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="Insurance">🛡️ Insurance</option>
+                            <option value="Vehicle">🚗 Vehicle</option>
+                            <option value="Identification">🆔 Identification</option>
+                            <option value="Subscriptions">💻 Subscriptions</option>
+                            <option value="Warranties">📦 Warranties</option>
+                            <option value="Other">📌 Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Expiration Date *</label>
+                        <input type="date" id="itemExpiryDate" required class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Renewal Frequency & Cost -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Renewal Cycle</label>
+                        <select id="itemFrequency" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="Yearly">Yearly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="6 Months">Every 6 Months</option>
+                            <option value="Every 2 Years">Every 2 Years</option>
+                            <option value="Every 5 Years">Every 5 Years</option>
+                            <option value="Every 10 Years">Every 10 Years</option>
+                            <option value="One-time">One-time</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Estimated Cost (Optional)</label>
+                        <input type="text" id="itemCost" placeholder="e.g., $120 / year" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Notification Alert Preferences Toggles -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Reminder Lead Times</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 bg-slate-900/60 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-900 transition">
+                            <input type="checkbox" id="notify30" checked class="w-4 h-4 text-brand-500 rounded bg-slate-800 border-slate-600 focus:ring-0">
+                            <span class="text-xs text-slate-300">30 Days</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 bg-slate-900/60 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-900 transition">
+                            <input type="checkbox" id="notify15" checked class="w-4 h-4 text-brand-500 rounded bg-slate-800 border-slate-600 focus:ring-0">
+                            <span class="text-xs text-slate-300">15 Days</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 bg-slate-900/60 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-900 transition">
+                            <input type="checkbox" id="notify7" checked class="w-4 h-4 text-brand-500 rounded bg-slate-800 border-slate-600 focus:ring-0">
+                            <span class="text-xs text-slate-300">7 Days</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 bg-slate-900/60 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-900 transition">
+                            <input type="checkbox" id="notify1" checked class="w-4 h-4 text-brand-500 rounded bg-slate-800 border-slate-600 focus:ring-0">
+                            <span class="text-xs text-slate-300">1 Day</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Notes / Renewal Link -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Notes / Renewal Link</label>
+                    <textarea id="itemNotes" rows="2" placeholder="Policy number, direct website URL to renew..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"></textarea>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/80">
+                    <button type="button" onclick="closeItemModal()" class="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow-lg shadow-brand-600/30 transition">
+                        Save Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WEBHOOK & AUTOMATED ALERTS SETUP MODAL -->
+    <div id="webhookModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8">
+            <div class="px-6 py-4 border-b border-slate-700/80 flex items-center justify-between bg-slate-800/50">
+                <h3 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane text-indigo-400"></i>
+                    <span>Automated Email & Phone Alerts</span>
+                </h3>
+                <button onclick="closeWebhookModal()" class="text-slate-400 hover:text-white p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6 text-sm text-slate-300">
+                <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 flex gap-3">
+                    <i class="fa-solid fa-circle-info text-indigo-400 text-lg mt-0.5"></i>
+                    <p class="text-xs leading-relaxed text-indigo-200">
+                        Browser notifications only work when your browser is open. To receive real <strong>Email, SMS, or Telegram alerts</strong> automatically when you are away, connect a webhook endpoint (such as <strong>Ntfy.sh</strong>, <strong>Make.com</strong>, <strong>Zapier</strong>, or <strong>Discord Webhook</strong>).
+                    </p>
+                </div>
+
+                <!-- Webhook Input -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-slate-200 uppercase tracking-wider">Webhook URL / Ntfy Topic</label>
+                    <input type="text" id="webhookUrl" placeholder="https://ntfy.sh/my_private_renewals_channel OR https://hooks.zapier.com/..." class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    <p class="text-xs text-slate-400">Tip: Use free services like <a href="https://ntfy.sh" target="_blank" class="text-indigo-400 underline">ntfy.sh</a> to send instant push notifications directly to your iOS or Android phone without writing code.</p>
+                </div>
+
+                <!-- Quick Tutorial / Options -->
+                <div class="border-t border-slate-700/80 pt-4 space-y-3">
+                    <h4 class="font-semibold text-xs text-slate-200 uppercase tracking-wider">Free & Simple Alert Integrations:</h4>
+                    <ul class="space-y-2 text-xs text-slate-400">
+                        <li class="flex items-start gap-2">
+                            <span class="text-brand-400 font-bold">1. Phone Push via Ntfy:</span> Enter <code class="bg-slate-900 px-1.5 py-0.5 rounded text-slate-200">https://ntfy.sh/your_custom_topic_name</code> and install the free Ntfy app on your phone.
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-sky-400 font-bold">2. Discord / Slack:</span> Paste your Discord channel Webhook URL to get direct notifications in your Discord server.
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-amber-400 font-bold">3. Zapier / Make (Email/SMS):</span> Connect a webhook trigger to send emails or SMS messages automatically.
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Modal Buttons -->
+                <div class="flex items-center justify-between pt-4 border-t border-slate-700/80">
+                    <button type="button" onclick="testWebhook()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl font-medium text-xs transition flex items-center gap-2">
+                        <i class="fa-solid fa-vial"></i> Send Test Notification
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeWebhookModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Close</button>
+                        <button type="button" onclick="saveWebhookSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition">Save Webhook</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        // Default Sample Items
+        const DEFAULT_ITEMS = [
+            {
+                id: '1',
+                name: 'Health Insurance Policy',
+                category: 'Insurance',
+                expiryDate: getOffsetDate(12), // 12 days from today
+                frequency: 'Yearly',
+                cost: '$350 / month',
+                notes: 'Policy #HI-883921. Web renewal link: https://example.com/renew',
+                notifications: { n30: true, n15: true, n7: true, n1: true }
+            },
+            {
+                id: '2',
+                name: 'Vehicle Registration (Car)',
+                category: 'Vehicle',
+                expiryDate: getOffsetDate(-5), // Expired 5 days ago
+                frequency: 'Yearly',
+                cost: '$140',
+                notes: 'DMV renewal reference ID: 8841-B',
+                notifications: { n30: true, n15: true, n7: true, n1: true }
+            },
+            {
+                id: '3',
+                name: 'Passport Expiration',
+                category: 'Identification',
+                expiryDate: getOffsetDate(180), // 180 days away
+                frequency: 'Every 10 Years',
+                cost: '$130',
+                notes: 'Remember to apply at least 3 months prior to international travel.',
+                notifications: { n30: true, n15: true, n7: true, n1: true }
+            },
+            {
+                id: '4',
+                name: 'Domain Name (mycompany.com)',
+                category: 'Subscriptions',
+                expiryDate: getOffsetDate(25), // 25 days away
+                frequency: 'Yearly',
+                cost: '$18 / year',
+                notes: 'Registered with Namecheap',
+                notifications: { n30: true, n15: true, n7: true, n1: true }
+            }
+        ];
+
+        // State variables
+        let items = [];
+        let viewMode = 'grid'; // 'grid' or 'table'
+        let webhookUrl = '';
+
+        // Helper to get relative dates formatted YYYY-MM-DD
+        function getOffsetDate(daysOffset) {
+            const d = new Date();
+            d.setDate(d.getDate() + daysOffset);
+            return d.toISOString().split('T')[0];
+        }
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            loadItems();
+            loadWebhookSettings();
+            checkNotificationPermissionStatus();
+            renderItems();
+            
+            // Check for notifications on launch and set recurring check
+            checkScheduledNotifications();
+            setInterval(checkScheduledNotifications, 60000); // Check every minute
+        });
+
+        // Load items from localStorage or load defaults
+        function loadItems() {
+            const saved = localStorage.getItem('expirykeeper_items');
+            if (saved) {
+                try {
+                    items = JSON.parse(saved);
+                } catch (e) {
+                    items = DEFAULT_ITEMS;
+                }
+            } else {
+                items = DEFAULT_ITEMS;
+                saveItemsToStorage();
+            }
+        }
+
+        function saveItemsToStorage() {
+            localStorage.setItem('expirykeeper_items', JSON.stringify(items));
+        }
+
+        // Load / Save Webhook Settings
+        function loadWebhookSettings() {
+            webhookUrl = localStorage.getItem('expirykeeper_webhook') || '';
+            document.getElementById('webhookUrl').value = webhookUrl;
+        }
+
+        function saveWebhookSettings() {
+            webhookUrl = document.getElementById('webhookUrl').value.trim();
+            localStorage.setItem('expirykeeper_webhook', webhookUrl);
+            showToast('Webhook settings saved!', 'success');
+            closeWebhookModal();
+        }
+
+        // Calculate days remaining
+        function getDaysRemaining(expiryDateStr) {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            const expiry = new Date(expiryDateStr);
+            expiry.setHours(0,0,0,0);
+
+            const diffTime = expiry - today;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        // Render Dashboard Stats and Items List
+        function renderItems() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+
+            // Counters
+            let countTotal = items.length;
+            let countExpiring = 0;
+            let countExpired = 0;
+            let countActive = 0;
+
+            items.forEach(item => {
+                const days = getDaysRemaining(item.expiryDate);
+                if (days < 0) countExpired++;
+                else if (days <= 30) countExpiring++;
+                else countActive++;
+            });
+
+            document.getElementById('statTotal').innerText = countTotal;
+            document.getElementById('statExpiring').innerText = countExpiring;
+            document.getElementById('statExpired').innerText = countExpired;
+            document.getElementById('statActive').innerText = countActive;
+
+            // Filter logic
+            const filtered = items.filter(item => {
+                const days = getDaysRemaining(item.expiryDate);
+
+                // Search Match
+                const matchesSearch = item.name.toLowerCase().includes(searchTerm) || 
+                                      (item.notes && item.notes.toLowerCase().includes(searchTerm)) ||
+                                      item.category.toLowerCase().includes(searchTerm);
+
+                // Category Match
+                const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+
+                // Status Match
+                let matchesStatus = true;
+                if (statusFilter === 'expired') matchesStatus = days < 0;
+                else if (statusFilter === 'expiring') matchesStatus = days >= 0 && days <= 30;
+                else if (statusFilter === 'active') matchesStatus = days > 30;
+
+                return matchesSearch && matchesCategory && matchesStatus;
+            });
+
+            // Sort by earliest expiry date
+            filtered.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+            const container = document.getElementById('itemsContainer');
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-12 text-center my-6">
+                        <div class="w-16 h-16 bg-slate-800 text-slate-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-slate-300">No items found</h3>
+                        <p class="text-xs text-slate-500 mt-1">Try adjusting your filters or click "Add Item" to track a new renewal.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (viewMode === 'grid') {
+                renderGridView(filtered, container);
+            } else {
+                renderTableView(filtered, container);
+            }
+        }
+
+        // Render Cards View
+        function renderGridView(itemList, container) {
+            let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">`;
+
+            itemList.forEach(item => {
+                const days = getDaysRemaining(item.expiryDate);
+                const badge = getStatusBadge(days);
+                const categoryIcon = getCategoryIcon(item.category);
+
+                html += `
+                    <div class="bg-slate-800/70 border border-slate-700/70 rounded-2xl p-5 hover:border-slate-600 transition flex flex-col justify-between shadow-lg relative group">
+                        <div>
+                            <!-- Header / Category & Status -->
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700/70 text-slate-300 rounded-lg flex items-center gap-1.5">
+                                    <i class="${categoryIcon}"></i> ${item.category}
+                                </span>
+                                ${badge.html}
+                            </div>
+
+                            <!-- Title -->
+                            <h3 class="font-bold text-slate-100 text-lg mb-1 leading-snug">${escapeHtml(item.name)}</h3>
+
+                            <!-- Expiry Info -->
+                            <div class="space-y-1.5 my-3">
+                                <div class="flex items-center text-xs text-slate-400 gap-2">
+                                    <i class="fa-regular fa-calendar text-slate-500"></i>
+                                    <span>Expires: <strong class="text-slate-200">${formatDate(item.expiryDate)}</strong></span>
+                                </div>
+                                <div class="flex items-center text-xs text-slate-400 gap-2">
+                                    <i class="fa-solid fa-arrows-rotate text-slate-500"></i>
+                                    <span>Cycle: ${item.frequency || 'N/A'} ${item.cost ? `(${escapeHtml(item.cost)})` : ''}</span>
+                                </div>
+                            </div>
+
+                            <!-- Notes -->
+                            ${item.notes ? `
+                                <div class="bg-slate-900/60 rounded-xl p-2.5 text-xs text-slate-400 border border-slate-700/50 mb-4 line-clamp-2">
+                                    ${escapeHtml(item.notes)}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Card Actions -->
+                        <div class="pt-3 border-t border-slate-700/60 flex items-center justify-between mt-2">
+                            <button onclick="downloadIcsCalendar('${item.id}')" class="text-xs text-slate-400 hover:text-indigo-400 transition flex items-center gap-1">
+                                <i class="fa-regular fa-calendar-plus"></i> +Calendar
+                            </button>
+                            <div class="flex items-center gap-2">
+                                <button onclick="editItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-700 rounded-lg transition" title="Delete">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        // Render Table View
+        function renderTableView(itemList, container) {
+            let html = `
+                <div class="bg-slate-800/70 border border-slate-700/70 rounded-2xl overflow-x-auto shadow-lg">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900/80 text-xs uppercase text-slate-400 border-b border-slate-700">
+                            <tr>
+                                <th class="px-5 py-3.5">Item Name</th>
+                                <th class="px-5 py-3.5">Category</th>
+                                <th class="px-5 py-3.5">Expiry Date</th>
+                                <th class="px-5 py-3.5">Status</th>
+                                <th class="px-5 py-3.5">Cycle / Cost</th>
+                                <th class="px-5 py-3.5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/60">
+            `;
+
+            itemList.forEach(item => {
+                const days = getDaysRemaining(item.expiryDate);
+                const badge = getStatusBadge(days);
+                const categoryIcon = getCategoryIcon(item.category);
+
+                html += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="px-5 py-4 font-semibold text-slate-100">
+                            ${escapeHtml(item.name)}
+                            ${item.notes ? `<p class="text-xs text-slate-400 font-normal truncate max-w-xs">${escapeHtml(item.notes)}</p>` : ''}
+                        </td>
+                        <td class="px-5 py-4">
+                            <span class="text-xs px-2.5 py-1 bg-slate-700/70 text-slate-300 rounded-lg inline-flex items-center gap-1.5">
+                                <i class="${categoryIcon}"></i> ${item.category}
+                            </span>
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap text-xs font-medium text-slate-200">
+                            ${formatDate(item.expiryDate)}
+                        </td>
+                        <td class="px-5 py-4 whitespace-nowrap">
+                            ${badge.html}
+                        </td>
+                        <td class="px-5 py-4 text-xs text-slate-400 whitespace-nowrap">
+                            ${item.frequency || 'N/A'} ${item.cost ? `(${escapeHtml(item.cost)})` : ''}
+                        </td>
+                        <td class="px-5 py-4 text-right whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-2">
+                                <button onclick="downloadIcsCalendar('${item.id}')" class="p-1.5 text-slate-400 hover:text-indigo-400 rounded-lg transition" title="Export to Calendar">
+                                    <i class="fa-regular fa-calendar-plus"></i>
+                                </button>
+                                <button onclick="editItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-white rounded-lg transition" title="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg transition" title="Delete">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // Get Status Badge Component
+        function getStatusBadge(days) {
+            if (days < 0) {
+                const pastDays = Math.abs(days);
+                return {
+                    status: 'expired',
+                    html: `<span class="px-2.5 py-1 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-lg inline-flex items-center gap-1">
+                            <i class="fa-solid fa-circle-xmark"></i> Expired ${pastDays}d ago
+                           </span>`
+                };
+            } else if (days <= 30) {
+                return {
+                    status: 'expiring',
+                    html: `<span class="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-lg inline-flex items-center gap-1">
+                            <i class="fa-solid fa-clock"></i> ${days === 0 ? 'Expires Today!' : `${days} days left`}
+                           </span>`
+                };
+            } else {
+                return {
+                    status: 'active',
+                    html: `<span class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold rounded-lg inline-flex items-center gap-1">
+                            <i class="fa-solid fa-circle-check"></i> ${days} days left
+                           </span>`
+                };
+            }
+        }
+
+        // Category Icon Mapping
+        function getCategoryIcon(cat) {
+            switch(cat) {
+                case 'Insurance': return 'fa-solid fa-shield-halved text-emerald-400';
+                case 'Vehicle': return 'fa-solid fa-car text-amber-400';
+                case 'Identification': return 'fa-solid fa-id-card text-sky-400';
+                case 'Subscriptions': return 'fa-solid fa-laptop text-indigo-400';
+                case 'Warranties': return 'fa-solid fa-box text-purple-400';
+                default: return 'fa-solid fa-bookmark text-slate-400';
+            }
+        }
+
+        // Toggle Grid/Table View Mode
+        function setViewMode(mode) {
+            viewMode = mode;
+            const gridBtn = document.getElementById('viewGridBtn');
+            const tableBtn = document.getElementById('viewTableBtn');
+
+            if (mode === 'grid') {
+                gridBtn.className = 'px-2.5 py-1 text-xs rounded font-medium text-slate-200 bg-slate-700 transition';
+                tableBtn.className = 'px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition';
+            } else {
+                tableBtn.className = 'px-2.5 py-1 text-xs rounded font-medium text-slate-200 bg-slate-700 transition';
+                gridBtn.className = 'px-2.5 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition';
+            }
+            renderItems();
+        }
+
+        // Status Filter Quick Action from Stat Cards
+        function filterByStatus(status) {
+            document.getElementById('statusFilter').value = status;
+            renderItems();
+        }
+
+        // Modal Controls
+        function openItemModal(itemId = null) {
+            const modal = document.getElementById('itemModal');
+            const form = document.getElementById('itemForm');
+            form.reset();
+
+            if (itemId) {
+                const item = items.find(i => i.id === itemId);
+                if (item) {
+                    document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-500"></i> Edit Item`;
+                    document.getElementById('itemId').value = item.id;
+                    document.getElementById('itemName').value = item.name;
+                    document.getElementById('itemCategory').value = item.category;
+                    document.getElementById('itemExpiryDate').value = item.expiryDate;
+                    document.getElementById('itemFrequency').value = item.frequency || 'Yearly';
+                    document.getElementById('itemCost').value = item.cost || '';
+                    document.getElementById('itemNotes').value = item.notes || '';
+                    
+                    const notifs = item.notifications || { n30: true, n15: true, n7: true, n1: true };
+                    document.getElementById('notify30').checked = notifs.n30 !== false;
+                    document.getElementById('notify15').checked = notifs.n15 !== false;
+                    document.getElementById('notify7').checked = notifs.n7 !== false;
+                    document.getElementById('notify1').checked = notifs.n1 !== false;
+                }
+            } else {
+                document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-plus-circle text-brand-500"></i> Add Renewal Item`;
+                document.getElementById('itemId').value = '';
+                document.getElementById('itemExpiryDate').value = getOffsetDate(30);
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.add('hidden');
+        }
+
+        function openWebhookModal() {
+            document.getElementById('webhookModal').classList.remove('hidden');
+        }
+
+        function closeWebhookModal() {
+            document.getElementById('webhookModal').classList.add('hidden');
+        }
+
+        function toggleDataMenu() {
+            const menu = document.getElementById('dataMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('dataMenu');
+            if (!e.target.closest('#dataMenu') && !e.target.closest('button[onclick="toggleDataMenu()"]')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Save Item Logic
+        function saveItem(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('itemId').value || Date.now().toString();
+            const newItem = {
+                id: id,
+                name: document.getElementById('itemName').value.trim(),
+                category: document.getElementById('itemCategory').value,
+                expiryDate: document.getElementById('itemExpiryDate').value,
+                frequency: document.getElementById('itemFrequency').value,
+                cost: document.getElementById('itemCost').value.trim(),
+                notes: document.getElementById('itemNotes').value.trim(),
+                notifications: {
+                    n30: document.getElementById('notify30').checked,
+                    n15: document.getElementById('notify15').checked,
+                    n7: document.getElementById('notify7').checked,
+                    n1: document.getElementById('notify1').checked
+                }
+            };
+
+            const index = items.findIndex(i => i.id === id);
+            if (index >= 0) {
+                items[index] = newItem;
+                showToast('Item updated successfully', 'success');
+            } else {
+                items.push(newItem);
+                showToast('New renewal item added!', 'success');
+            }
+
+            saveItemsToStorage();
+            closeItemModal();
+            renderItems();
+            checkScheduledNotifications();
+        }
+
+        function editItem(id) {
+            openItemModal(id);
+        }
+
+        function deleteItem(id) {
+            if (confirm('Are you sure you want to delete this renewal item?')) {
+                items = items.filter(i => i.id !== id);
+                saveItemsToStorage();
+                renderItems();
+                showToast('Item deleted', 'info');
+            }
+        }
+
+        // Browser Notification Integration
+        function checkNotificationPermissionStatus() {
+            const banner = document.getElementById('notificationBanner');
+            const notifBtn = document.getElementById('notifBtn');
+            const notifText = document.getElementById('notifText');
+            const notifIcon = document.getElementById('notifIcon');
+
+            if (!("Notification" in window)) {
+                notifText.innerText = "Alerts Unsupported";
+                return;
+            }
+
+            if (Notification.permission === "granted") {
+                banner.classList.add('hidden');
+                notifText.innerText = "Alerts Active";
+                notifIcon.className = "fa-solid fa-bell text-emerald-400";
+            } else if (Notification.permission === "denied") {
+                banner.classList.remove('hidden');
+                notifText.innerText = "Alerts Blocked";
+                notifIcon.className = "fa-solid fa-bell-slash text-rose-400";
+            } else {
+                banner.classList.remove('hidden');
+                notifText.innerText = "Enable Alerts";
+                notifIcon.className = "fa-solid fa-bell text-yellow-400";
+            }
+        }
+
+        function requestBrowserNotifications() {
+            if (!("Notification" in window)) {
+                showToast("Your browser does not support desktop notifications.", "error");
+                return;
+            }
+
+            Notification.requestPermission().then(permission => {
+                checkNotificationPermissionStatus();
+                if (permission === "granted") {
+                    showToast("Browser notifications enabled!", "success");
+                    new Notification("ExpiryKeeper Active", {
+                        body: "You will now receive alerts before your items expire.",
+                        icon: "https://cdn-icons-png.flaticon.com/512/3602/3602145.png"
+                    });
+                }
+            });
+        }
+
+        // Scheduled Notification Engine (Checks 30, 15, 7, 1 days)
+        function checkScheduledNotifications() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const lastChecked = localStorage.getItem('expirykeeper_last_notif_check');
+
+            items.forEach(item => {
+                const days = getDaysRemaining(item.expiryDate);
+                const notifs = item.notifications || {};
+
+                let triggerAlert = false;
+                let alertMessage = '';
+
+                if (days === 30 && notifs.n30) {
+                    triggerAlert = true;
+                    alertMessage = `${item.name} expires in 30 days (${formatDate(item.expiryDate)}).`;
+                } else if (days === 15 && notifs.n15) {
+                    triggerAlert = true;
+                    alertMessage = `${item.name} expires in 15 days (${formatDate(item.expiryDate)}).`;
+                } else if (days === 7 && notifs.n7) {
+                    triggerAlert = true;
+                    alertMessage = `URGENT: ${item.name} expires in 7 days!`;
+                } else if (days === 1 && notifs.n1) {
+                    triggerAlert = true;
+                    alertMessage = `CRITICAL: ${item.name} expires tomorrow!`;
+                }
+
+                if (triggerAlert) {
+                    // Send Browser Notification
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification(`Renewal Reminder: ${item.name}`, {
+                            body: alertMessage,
+                            icon: "https://cdn-icons-png.flaticon.com/512/3602/3602145.png"
+                        });
+                    }
+
+                    // Trigger Webhook if configured
+                    if (webhookUrl) {
+                        sendWebhookNotification(item.name, alertMessage);
+                    }
+                }
+            });
+
+            localStorage.setItem('expirykeeper_last_notif_check', todayStr);
+        }
+
+        // Send Webhook (Supports Ntfy, Discord, Custom Webhooks)
+        function sendWebhookNotification(title, body) {
+            if (!webhookUrl) return;
+
+            fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic: 'renewals',
+                    title: `ExpiryKeeper: ${title}`,
+                    message: body,
+                    content: body
+                })
+            }).catch(err => console.error('Webhook error:', err));
+        }
+
+        // Test Webhook Action
+        function testWebhook() {
+            const url = document.getElementById('webhookUrl').value.trim();
+            if (!url) {
+                showToast('Please enter a Webhook URL first.', 'error');
+                return;
+            }
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Test ExpiryKeeper Notification',
+                    message: 'Your automated renewal alert system is correctly connected!'
+                })
+            })
+            .then(() => showToast('Test alert sent successfully!', 'success'))
+            .catch(err => showToast('Failed to send test alert. Check URL or CORS settings.', 'error'));
+        }
+
+        // iCalendar (.ics) File Generation
+        function downloadIcsCalendar(itemId) {
+            const item = items.find(i => i.id === itemId);
+            if (!item) return;
+
+            const icsData = generateIcsContent([item]);
+            downloadFile(`${item.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_renewal.ics`, icsData, 'text/calendar');
+            showToast('Calendar event file (.ics) downloaded!', 'success');
+        }
+
+        function exportAllCalendar() {
+            if (items.length === 0) {
+                showToast('No items to export.', 'error');
+                return;
+            }
+            const icsData = generateIcsContent(items);
+            downloadFile('all_renewals_calendar.ics', icsData, 'text/calendar');
+            showToast('All renewals exported to calendar (.ics)', 'success');
+        }
+
+        function generateIcsContent(itemList) {
+            let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ExpiryKeeper//Renewal Tracker//EN\nCALSCALE:GREGORIAN\n";
+
+            itemList.forEach(item => {
+                const cleanDate = item.expiryDate.replace(/-/g, '');
+                ics += "BEGIN:VEVENT\n";
+                ics += `SUMMARY:Renew ${item.name}\n`;
+                ics += `DESCRIPTION:Renewal for ${item.name} (${item.category}). ${item.notes || ''}\n`;
+                ics += `DTSTART;VALUE=DATE:${cleanDate}\n`;
+                ics += `DTEND;VALUE=DATE:${cleanDate}\n`;
+                ics += "STATUS:CONFIRMED\n";
+                ics += "BEGIN:VALARM\nTRIGGER:-P7D\nACTION:DISPLAY\nDESCRIPTION:7 Day Renewal Reminder\nEND:VALARM\n";
+                ics += "END:VEVENT\n";
+            });
+
+            ics += "END:VCALENDAR";
+            return ics;
+        }
+
+        // JSON Backup & Restore
+        function exportJSON() {
+            const dataStr = JSON.stringify(items, null, 2);
+            downloadFile('expirykeeper_backup.json', dataStr, 'application/json');
+            showToast('Backup JSON downloaded!', 'success');
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        items = imported;
+                        saveItemsToStorage();
+                        renderItems();
+                        showToast('Backup restored successfully!', 'success');
+                    } else {
+                        showToast('Invalid backup file format.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Failed to parse JSON file.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetPresetData() {
+            if (confirm('Reset to demo sample items? Custom added items will be replaced.')) {
+                items = DEFAULT_ITEMS;
+                saveItemsToStorage();
+                renderItems();
+                showToast('Reset to demo sample data.', 'info');
+            }
+        }
+
+        // Utility: Download Helper
+        function downloadFile(filename, content, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Utility: Formatting Date
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, options);
+        }
+
+        // Utility: HTML Escaping
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        // Custom Toast System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            let borderColors = 'border-brand-500 text-brand-200';
+            let icon = 'fa-circle-check text-brand-400';
+
+            if (type === 'error') {
+                borderColors = 'border-rose-500 text-rose-200';
+                icon = 'fa-circle-exclamation text-rose-400';
+            } else if (type === 'info') {
+                borderColors = 'border-sky-500 text-sky-200';
+                icon = 'fa-circle-info text-sky-400';
+            }
+
+            toast.className = `bg-slate-800 border ${borderColors} p-3.5 rounded-xl shadow-xl flex items-center gap-3 text-xs font-medium transform transition-all duration-300 pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icon} text-base"></i>
+                <span class="flex-1">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
